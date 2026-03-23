@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Simulador MySQL Educacional JÉFFERSON AZEVEDO</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+
+<style>
+
+body{
+    font-family: monospace;
+    background:#1e1e1e;
+    color:#00ff88;
+    margin:0;
+}
+
+header{
+    background:#000;
+    padding:15px;
+    text-align:center;
+    font-size:20px;
+}
+
+.aluno{
+    text-align:center;
+    font-size:16px;
+    margin-top:5px;
+    color:#00ff88;
+}
+
+.container{
+    padding:20px;
+}
+
+textarea{
+    width:100%;
+    height:160px;
+    background:#000;
+    color:#00ff88;
+    border:1px solid #00ff88;
+    padding:10px;
+    font-size:14px;
+}
+
+button{
+    background:#00ff88;
+    color:black;
+    border:none;
+    padding:10px 20px;
+    margin-top:10px;
+    cursor:pointer;
+    margin-right:10px;
+}
+
+button:hover{
+    background:#00cc66;
+}
+
+.result{
+    margin-top:20px;
+    background:black;
+    padding:15px;
+    border:1px solid #00ff88;
+    min-height:120px;
+}
+
+table{
+    border-collapse:collapse;
+    width:100%;
+    color:white;
+}
+
+th, td{
+    border:1px solid #00ff88;
+    padding:6px;
+}
+
+.erro{
+    color:red;
+    font-weight:bold;
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+footer{
+    background:black;
+    color:#00ff88;
+    text-align:center;
+    padding:10px;
+    position:fixed;
+    bottom:0;
+    width:100%;
+    border-top:1px solid #00ff88;
+}
+
+/* MODO IMPRESSÃO COMPLETO */
+@media print {
+
+    body{
+        background:white;
+        color:black;
+    }
+
+    header, footer{
+        background:white;
+        color:black;
+        border:none;
+    }
+
+    textarea{
+        background:white;
+        color:black;
+        border:1px solid black;
+    }
+
+    button{
+        display:none;
+    }
+
+    .result{
+        background:white;
+        color:black;
+        border:1px solid black;
+    }
+
+    table{
+        color:black;
+    }
+
+    th, td{
+        border:1px solid black;
+    }
+
+    .aluno{
+        color:black;
+        font-size:18px;
+        font-weight:bold;
+    }
+
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+SIMULADOR MySQL EDUCACIONAL JÉFFERSON AZEVEDO 💻📚🎒
+</header>
+
+<div class="aluno" id="nomeAluno"></div>
+
+<div class="container">
+
+<textarea id="sql" placeholder="Digite seu comando SQL aqui..."></textarea>
+
+<br>
+
+<button onclick="executar()">Executar</button>
+<button onclick="limpar()">Limpar</button>
+<button onclick="imprimir()">Imprimir Atividade</button>
+
+<div class="result" id="saida"></div>
+
+</div>
+
+<footer>
+© Direitos autorais JÉFFERSON AZEVEDO
+</footer>
+
+<script>
+
+let SQL;
+let databases = {};
+let currentDB = null;
+let aluno = "";
+
+/* SOLICITA NOME */
+window.onload = function(){
+    aluno = prompt("Digite o nome do aluno:");
+    if(!aluno){
+        aluno = "Aluno não informado";
+    }
+    document.getElementById("nomeAluno").innerHTML = "Aluno: " + aluno;
+};
+
+initSqlJs({
+    locateFile: file => 
+    "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/" + file
+}).then(sql => {
+    SQL = sql;
+});
+
+function limpar(){
+    document.getElementById("sql").value = "";
+    document.getElementById("saida").innerHTML = "";
+}
+
+function imprimir(){
+    window.print();
+}
+
+function erro(msg){
+    return `
+    <div class="erro">
+        <img src="https://cdn-icons-png.flaticon.com/512/463/463612.png" width="25">
+        ${msg}
+    </div>
+    `;
+}
+
+function executar(){
+
+    let comando = document.getElementById("sql").value.trim();
+    let saida = document.getElementById("saida");
+
+    if(comando == ""){
+        saida.innerHTML = erro("Digite um comando SQL");
+        return;
+    }
+
+    let linhas = comando.split(";");
+    let resultadoHTML = "";
+
+    linhas.forEach(cmd => {
+
+        cmd = cmd.trim();
+        if(cmd == "") return;
+
+        let lower = cmd.toLowerCase();
+
+        try{
+
+            if(lower.startsWith("create database")){
+
+                let nome = cmd.split(" ")[2];
+                databases[nome] = new SQL.Database();
+                resultadoHTML += "Database "+nome+" criado<br>";
+            }
+
+            else if(lower.startsWith("use")){
+
+                let nome = cmd.split(" ")[1];
+
+                if(databases[nome]){
+                    currentDB = databases[nome];
+                    resultadoHTML += "Usando banco "+nome+"<br>";
+                }else{
+                    resultadoHTML += erro("Database não existe");
+                }
+            }
+
+            else if(lower.startsWith("show databases")){
+
+                resultadoHTML += "<b>Databases:</b><br>";
+
+                for(let db in databases){
+                    resultadoHTML += db+"<br>";
+                }
+            }
+
+            else if(lower.startsWith("show tables")){
+
+                if(!currentDB){
+                    resultadoHTML += erro("Selecione um banco primeiro");
+                    return;
+                }
+
+                let res = currentDB.exec(
+                "SELECT name FROM sqlite_master WHERE type='table';"
+                );
+
+                if(res.length>0){
+
+                    resultadoHTML += "<table><tr><th>Tabelas</th></tr>";
+
+                    res[0].values.forEach(t=>{
+                        resultadoHTML += "<tr><td>"+t[0]+"</td></tr>";
+                    });
+
+                    resultadoHTML += "</table>";
+                }else{
+                    resultadoHTML += "Nenhuma tabela encontrada<br>";
+                }
+            }
+
+            else{
+
+                if(!currentDB){
+                    resultadoHTML += erro("Selecione um banco primeiro");
+                    return;
+                }
+
+                let res = currentDB.exec(cmd);
+
+                if(res.length > 0){
+
+                    res.forEach(tabela => {
+
+                        resultadoHTML += "<table><tr>";
+
+                        tabela.columns.forEach(c=>{
+                            resultadoHTML += "<th>"+c+"</th>";
+                        });
+
+                        resultadoHTML += "</tr>";
+
+                        tabela.values.forEach(linha=>{
+
+                            resultadoHTML += "<tr>";
+
+                            linha.forEach(v=>{
+                                resultadoHTML += "<td>"+v+"</td>";
+                            });
+
+                            resultadoHTML += "</tr>";
+
+                        });
+
+                        resultadoHTML += "</table><br>";
+
+                    });
+
+                }else{
+                    resultadoHTML += "Comando executado com sucesso<br>";
+                }
+            }
+
+        }catch(e){
+            resultadoHTML += erro("Erro de sintaxe SQL");
+        }
+
+    });
+
+    saida.innerHTML = resultadoHTML;
+}
+
+</script>
+
+</body>
+</html>
